@@ -6,7 +6,7 @@ import argparse
 import sys
 
 # Define the folder where you want to save the output
-output_folder = "training-data"  
+output_folder = "training-data"
 
 # Check if the folder exists, and if not, create it
 os.makedirs(output_folder, exist_ok=True)
@@ -16,61 +16,61 @@ def generate_query_range(prometheus_url, query, start_time, end_time, step):
     return f"{prometheus_url}/api/v1/query_range?query={query}&start={start_time}&end={end_time}&step={step}"
 
 # Function to convert a date to a UNIX timestamp
-def date_to_unix_timestamp(days_ago):
-    target_date = datetime.now(timezone.utc) - timedelta(days=days_ago)
-    return int(target_date.timestamp())
+def date_to_unix_timestamp(date):
+    return int(date.timestamp())
+
+# Function to query Prometheus in chunks
+def query_prometheus_in_chunks(prometheus_url, query, start_time, end_time, step):
+    current_time = start_time
+    all_data = []
+
+    while current_time < end_time:
+        next_time = min(current_time + timedelta(days=1), end_time)  # Querying in 1-day chunks
+        url = generate_query_range(prometheus_url, query, date_to_unix_timestamp(current_time), date_to_unix_timestamp(next_time), step)
+        response = requests.get(url)
+        response_json = response.json()
+
+        if response_json['status'] != 'success':
+            print(f"Error querying Prometheus data: {response_json['error']}")
+            sys.exit(1)
+
+        if 'result' in response_json['data'] and response_json['data']['result']:
+            all_data.extend(response_json['data']['result'][0]['values'])
+
+        current_time = next_time
+
+    return all_data
 
 # Function to get the bandwidth data from Prometheus
-def get_bandwidth_data(prometheus_url, router_ip, interface_name, days, step):
-    start_time = date_to_unix_timestamp(days)
-    end_time = int(datetime.now(timezone.utc).timestamp())  # Now
+def get_bandwidth_data(prometheus_url, router_ip, interface_name, start_time, end_time, step):
     query = f'rate(ifHCInOctets{{ifName="{interface_name}", instance="{router_ip}:161"}}[30s]) * 8'
-    
-    url = generate_query_range(prometheus_url, query, start_time, end_time, step)
-    
-    response = requests.get(url)
-    response_json = response.json()
-    
-    if response_json['status'] != 'success':
-        print(f"Error querying bandwidth data: {response_json['error']}")
-        sys.exit(1)
-    
-    return response_json['data']['result'][0]['values']  # List of [timestamp, bandwidth_rate]
+    return query_prometheus_in_chunks(prometheus_url, query, start_time, end_time, step)
 
 # Function to get the web app health from Prometheus
-def get_web_app_health(prometheus_url, web_app_url, days, step):
-    start_time = date_to_unix_timestamp(days)
-    end_time = int(datetime.now(timezone.utc).timestamp())  # Now
+def get_web_app_health(prometheus_url, web_app_url, start_time, end_time, step):
     query = f'avg_over_time(probe_success{{instance="{web_app_url}"}}[30s])'
-    
-    url = generate_query_range(prometheus_url, query, start_time, end_time, step)
-    
-    response = requests.get(url)
-    response_json = response.json()
-    
-    if response_json['status'] != 'success':
-        print(f"Error querying web app health data: {response_json['error']}")
-        sys.exit(1)
-    
-    # Check if the result array is empty
-    if not response_json['data']['result']:
-        print(f"No data returned for web app instance {web_app_url}. Please check if the instance exists and has data in the specified time range.")
-        sys.exit(1)
-    
-    return response_json['data']['result'][0]['values']  # List of [timestamp, web_app_health_percentage]
+    return query_prometheus_in_chunks(prometheus_url, query, start_time, end_time, step)
 
 # Function to combine bandwidth and web app health data
 def combine_data(bandwidth_data, web_app_health_data):
     combined_data = []
-    
-    # Assuming both datasets have the same timestamps, we can just zip them together
-    for (bw_timestamp, bw_value), (health_timestamp, health_value) in zip(bandwidth_data, web_app_health_data):
-        # Use timezone-aware datetime conversion
-        combined_data.append([
-            datetime.fromtimestamp(float(bw_timestamp), timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-            int(float(bw_value)),  # Bandwidth in integer (bps)
-            round(float(health_value) * 100, 2)  # Web app health percentage with two decimals
-        ])
+    bandwidth_data_dict = {bw_timestamp: bw_value for bw_timestamp, bw_value in bandwidth_data}
+    health_data_dict = {health_timestamp: health_value for health_timestamp, health_value in web_app_health_data}
+
+    # Ensure that we include all timestamps, even if one set is missing data
+    all_timestamps = sorted(set(bandwidth_data_dict.keys()).union(health_data_dict.keys()))
+
+    for timestamp in all_timestamps:
+        bw_value = bandwidth_data_dict.get(timestamp)
+        health_value = health_data_dict.get(timestamp)
+
+        # Only append if both bandwidth and health data are available for the timestamp
+        if bw_value is not None and health_value is not None:
+            combined_data.append([
+                datetime.fromtimestamp(float(timestamp), timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                int(float(bw_value)),  # Bandwidth in integer (bps)
+                round(float(health_value) * 100, 2)  # Web app health percentage with two decimals
+            ])
     
     return combined_data
 
@@ -95,14 +95,18 @@ def main():
     
     # Parse the arguments
     args = parser.parse_args()
-    
+
+    # Define start and end time
+    end_time = datetime.now(timezone.utc)  # Current time (now)
+    start_time = end_time - timedelta(days=args.days)  # Days ago
+
     # Get bandwidth data
-    print("Querying bandwidth data...")
-    bandwidth_data = get_bandwidth_data(args.prometheus_url, args.router_ip, args.interface_name, args.days, args.step)
+    print(f"Querying bandwidth data for the last {args.days} days...")
+    bandwidth_data = get_bandwidth_data(args.prometheus_url, args.router_ip, args.interface_name, start_time, end_time, args.step)
     
     # Get web app health data
-    print("Querying web app health data...")
-    web_app_health_data = get_web_app_health(args.prometheus_url, args.web_app_url, args.days, args.step)
+    print(f"Querying web app health data for the last {args.days} days...")
+    web_app_health_data = get_web_app_health(args.prometheus_url, args.web_app_url, start_time, end_time, args.step)
     
     # Combine the data
     print("Combining data...")
@@ -116,7 +120,7 @@ def main():
     
     write_to_csv(output_path, combined_data)
     
-    print(f"Data written to {output_filename}")
+    print(f"Data written to {output_path}")
 
 if __name__ == "__main__":
     main()

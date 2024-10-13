@@ -1,0 +1,1 @@
+python data-collection-training.py --prometheus-url http://10.0.1.101:9090 --router-ip 10.0.2.1 --interface-name Fa0/0 --web-app-url http://10.0.3.101 --days 21 --step 10s
