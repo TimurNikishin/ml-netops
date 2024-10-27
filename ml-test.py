@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model # type: ignore
+
 
 # Load the trained model
 model = load_model('network_failure_model.keras')
