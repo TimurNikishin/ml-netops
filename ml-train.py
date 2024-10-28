@@ -9,7 +9,7 @@ from tensorflow.keras.layers import Dense, Input # type: ignore
 import argparse
 import json
 
-# 1. Define command-line arguments
+# Define command-line arguments
 parser = argparse.ArgumentParser(description='Train a neural network to predict web app failures based on bandwidth data.')
 parser.add_argument('--csv-path', type=str, required=True, help='Path to the CSV file containing training data.')
 parser.add_argument('--epochs', type=int, default=50, help='Number of epochs for training the model.')
@@ -20,7 +20,7 @@ parser.add_argument('--learning-rate', type=float, default=0.001, help='Learning
 
 args = parser.parse_args()
 
-# 2. Load the CSV Data
+# Load the CSV Data
 df = pd.read_csv(args.csv_path)
 df['web_app_failure'] = df['Web App Health (%)'].apply(lambda x: 1 if x < 95 else 0)
 scaler = MinMaxScaler()
@@ -32,7 +32,7 @@ Y = df['web_app_failure'].values
 # Split the data into training (70%) and testing (30%) sets.
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3, shuffle=False)
 
-# 3. Build the Neural Network Model
+# Build the Neural Network Model
 model = Sequential()
 model.add(Input(shape=(1,)))
 
@@ -42,17 +42,17 @@ for neurons in args.hidden_layers:
 
 model.add(Dense(1, activation='sigmoid'))
 
-# 4. Compile the Model
+# Compile the Model
 from tensorflow.keras.optimizers import Adam # type: ignore
 model.compile(optimizer=Adam(learning_rate=args.learning_rate), loss='binary_crossentropy', metrics=['accuracy'])
 
-# 5. Train the Model with minimal output
+# Train the Model with minimal output
 model.fit(X_train, Y_train, epochs=args.epochs, batch_size=args.batch_size, validation_split=0.3, verbose=0)
 
-# 6. Evaluate the Model on Test Data with minimal output
+# Evaluate the Model on Test Data with minimal output
 loss, accuracy = model.evaluate(X_test, Y_test, verbose=0)
 
-# 7. Make Predictions on Test Data
+# Make Predictions on Test Data
 predictions = (model.predict(X_test, verbose=0) > 0.5).astype("int32")
 
 # Calculate classification metrics
