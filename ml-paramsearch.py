@@ -99,7 +99,7 @@ if not results_df.empty:
     results_df = results_df.sort_values(by='accuracy', ascending=False)
 
     # Save the results to a CSV file
-    results_df.to_csv('hyperparameter_search_results.csv', index=False)
-    print("Hyperparameter search completed. Results saved to 'hyperparameter_search_results.csv'.")
+    results_df.to_csv('parameter_search_results.csv', index=False)
+    print("Parameter search completed. Results saved to 'parameter_search_results.csv'.")
 else:
     print("No valid results to save.")
