@@ -29,6 +29,11 @@ df['web_app_failure'] = df['Web App Health (%)'].apply(lambda x: 1 if x < 95 els
 scaler = MinMaxScaler()
 df['bandwidth_rate_normalized'] = scaler.fit_transform(df[['Bandwidth Rate (bps)']])
 
+# Save the maximum bandwidth value for use in prediction
+max_bandwidth = df['Bandwidth Rate (bps)'].max()
+with open('max_bandwidth.txt', 'w') as f:
+    f.write(str(max_bandwidth))
+
 X = df[['bandwidth_rate_normalized']].values
 Y = df['web_app_failure'].values
 
