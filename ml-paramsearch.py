@@ -6,14 +6,14 @@ import os
 import json
 
 # Define possible values for each hyperparameter
-csv_path = 'data-collection/training-data/combined_output_2024-10-27_11-13-36.csv'
-epochs = [2, 5, 10, 25, 50, 100]  # Number of epochs to test
+csv_path = 'data-collection/training-data/combined_output_2024-10-28_19-08-22.csv'
+epochs = [2, 5, 10, 25, 50]  # Number of epochs to test
 #batch_sizes = [32]  # Batch sizes to test
 batch_sizes = [32, 64]  # Batch sizes to test
 #hidden_layers_options = [[32, 16]]  # Hidden layer configurations
 hidden_layers_options = [[16, 8], [32, 16], [64, 32]]  # Hidden layer configurations
 #activation_functions = ['relu']  # Activation functions to test
-activation_functions = ['relu', 'tanh']  # Activation functions to test
+activation_functions = ['relu']  # Activation functions to test
 #earning_rates = [0.001]  # Learning rates to test
 learning_rates = [0.001, 0.0001]  # Learning rates to test
 
