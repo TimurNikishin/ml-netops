@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt # type: ignore
 model = load_model('network_failure_model.keras')
 
 # Load the dataset
-df = pd.read_csv('data-collection/training-data/combined_output_2024-10-27_11-13-36.csv')
+df = pd.read_csv('data-collection/training-data/combined_output_2024-10-28_19-08-22.csv')
 
 # Add the 'web_app_failure' column if it doesn't exist
 if 'web_app_failure' not in df.columns:
