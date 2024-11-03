@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from tensorflow.keras.models import load_model # type: ignore
-import matplotlib.pyplot as plt # type: ignore
+from tensorflow.keras.models import load_model  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler
 
@@ -12,7 +12,7 @@ model = load_model("network_failure_model.keras")
 with open("max_bandwidth.txt", "r") as f:
     max_bandwidth = float(f.readline().strip())
 
-# Load new data from a CSV file (live data for trend analysis)
+# Load new data from a CSV file
 df = pd.read_csv("data-collection\\training-data\\data_set_for_failure_prediction.csv")
 
 # Ensure "Timestamp" column is in datetime format
@@ -21,7 +21,7 @@ df['Timestamp'] = pd.to_datetime(df['Timestamp'])
 # Calculate time intervals in hours from the first timestamp
 df['Time (hours)'] = (df['Timestamp'] - df['Timestamp'].iloc[0]).dt.total_seconds() / 3600
 
-# Normalize the live data bandwidth using the max_bandwidth from the file
+# Normalize bandwidth using the max_bandwidth from the file
 df['normalized_bandwidth'] = df['Bandwidth Rate (bps)'] / max_bandwidth
 
 # Fit a linear regression model to show bandwidth trend over time
@@ -37,54 +37,61 @@ last_time = df['Time (hours)'].iloc[-1]  # Get the last time in hours
 future_time = np.arange(last_time + 1, last_time + 1 + future_time_steps).reshape(-1, 1)
 future_bandwidth = regression_model.predict(future_time)
 
-# --- Calculate Failure Probability Thresholds from Training Data ---
+# Plot actual bandwidth data, trend line, and future projection
+fig, ax1 = plt.subplots(figsize=(10, 6))
 
-# Load training data for calculating probability thresholds
-training_df = pd.read_csv("data-collection/training-data/combined_output_2024-10-28_19-08-22.csv")
+# Plot bandwidth rate over time on primary Y-axis
+ax1.plot(df['Time (hours)'], Y_bandwidth, label="Actual Bandwidth Rate (bps)", color='blue')
+ax1.plot(df['Time (hours)'], trend_line, label="Bandwidth Trend Line", linestyle="--", color='orange')
+ax1.plot(future_time, future_bandwidth, label="Projected Future Bandwidth", linestyle="--", color='green')
+ax1.set_xlabel("Time (Hours)")
+ax1.set_ylabel("Bandwidth Rate (bps)")
+ax1.set_title("Bandwidth Rate and Projected Trend Over Time")
+ax1.legend(loc="upper left")
+ax1.grid(True)
 
-# Calculate min and max bandwidth for normalization based on training data
+# Load the training dataset to get min and max bandwidth values
+df_ref = pd.read_csv("data-collection/training-data/combined_output_2024-10-28_19-08-22.csv")
 scaler = MinMaxScaler()
-training_df['normalized_bandwidth'] = scaler.fit_transform(training_df[['Bandwidth Rate (bps)']])
+df_ref['bandwidth_rate_normalized'] = scaler.fit_transform(df_ref[['Bandwidth Rate (bps)']])
 
-# Generate a range of bandwidth rates for failure probability calculation
-bandwidth_range = np.linspace(training_df['Bandwidth Rate (bps)'].min(), training_df['Bandwidth Rate (bps)'].max(), 100).reshape(-1, 1)
-normalized_bandwidth_range = scaler.transform(bandwidth_range)
+# Set y-axis ticks for bandwidth rate based on training dataset's min and max bandwidth
+min_bandwidth = df_ref['Bandwidth Rate (bps)'].min()
+max_bandwidth = df_ref['Bandwidth Rate (bps)'].max()
+ax1.set_yticks(np.linspace(min_bandwidth, max_bandwidth, 10))
+ax1.set_yticklabels([f"{int(y):,}" for y in np.linspace(min_bandwidth, max_bandwidth, 10)])
 
-# Predict failure probabilities
-failure_probabilities = model.predict(normalized_bandwidth_range).flatten() * 100
+# Generate bandwidth rates for failure prediction
+bandwidth_rates_actual = np.linspace(min_bandwidth, max_bandwidth, 100).reshape(-1, 1)
+normalized_bandwidth_rates = scaler.transform(bandwidth_rates_actual)
+failure_probabilities = model.predict(normalized_bandwidth_rates, verbose=0).flatten() * 100  # Convert to percentage
 
-# Calculate bandwidth thresholds for each failure probability level (10%, 20%, ..., 100%)
+# Calculate failure probability thresholds
 thresholds = np.arange(10, 101, 10)
-bandwidth_thresholds = {}
+bandwidth_at_thresholds = {}
 
 for threshold in thresholds:
     idx = (np.abs(failure_probabilities - threshold)).argmin()
-    bandwidth_thresholds[threshold] = bandwidth_range[idx][0]
+    bandwidth_at_thresholds[threshold] = bandwidth_rates_actual[idx][0]
 
-# --- Plotting ---
+# Add failure probability thresholds on secondary Y-axis without labels
+ax2 = ax1.twinx()
+ax2.set_ylabel("Failure Probability (%)")
 
-plt.figure(figsize=(10, 6))
+# Set y-axis ticks for failure probability but hide labels
+ax2.set_yticks(list(bandwidth_at_thresholds.values()))
+ax2.set_yticklabels([])  # Hide the labels for the probability Y-axis
 
-# Plot actual bandwidth data and the trend line from live data
-plt.plot(df['Time (hours)'], Y_bandwidth, label="Actual Bandwidth Rate (bps)", color='blue')
-plt.plot(df['Time (hours)'], trend_line, label="Bandwidth Trend Line", linestyle="--", color='orange')
-plt.plot(future_time, future_bandwidth, label="Projected Future Bandwidth", linestyle="--", color='green')
-
-# Add failure probability thresholds as horizontal lines
-for threshold, bw in bandwidth_thresholds.items():
-    plt.axhline(y=bw, color='red', linestyle=":", label=f"{threshold}% Failure Probability at {int(bw):,} bps")
-
-plt.xlabel("Time (Hours)")
-plt.ylabel("Bandwidth Rate (bps)")
-plt.title("Bandwidth Rate and Projected Trend with Failure Probability Thresholds")
-plt.legend()
-plt.grid(True)
+# Plot threshold lines and add indented labels on the left side of bandwidth Y-axis
+for i, (prob, bandwidth) in enumerate(bandwidth_at_thresholds.items()):
+    x_position = last_time * 0.05  # Set position to the left side with indentation
+    indent = i * 4  # Increase indentation for each subsequent label
+    ax1.axhline(y=bandwidth, linestyle="--", color="red", linewidth=0.5)
+    ax1.text(x_position + indent, bandwidth, f"{prob}%", color="red",
+             va="center", ha="left", fontweight="bold")
 
 # Set y-axis to start from 0 to avoid negative values
-plt.ylim(bottom=0)
-
-# Adjust y-axis tick labels to display bandwidth in bps format
-plt.yticks([int(y) for y in plt.yticks()[0]], [f"{int(y):,}" for y in plt.yticks()[0]])
+ax1.set_ylim(bottom=0)
 
 plt.tight_layout()
 plt.show()
