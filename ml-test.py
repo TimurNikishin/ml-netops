@@ -9,10 +9,10 @@ model = load_model('network_failure_model.keras')
 
 # Load the CSV data (used for training)
 # Replace with the actual path to your CSV file that was used for training
-df = pd.read_csv('data-collection\\training-data\\combined_output_2024-10-13_19-40-34.csv')
+df = pd.read_csv('data-collection\\training-data\\combined_output_2024-10-28_19-08-22.csv')
 
 # Example bandwidth rate (in bps) to test manually
-example_bandwidth_rate = 30000000  # Replace with the bandwidth rate you want to test (in bps)
+example_bandwidth_rate = 15000000  # Replace with the bandwidth rate you want to test (in bps)
 
 # Initialize the MinMaxScaler and fit it using the training data's bandwidth rates
 train_bandwidth_data = df[['Bandwidth Rate (bps)']]  # Use the training data for scaling
